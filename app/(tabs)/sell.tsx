@@ -112,6 +112,12 @@ function VerifiedView() {
         onPress={() => router.push('/create-listing')}
       />
       <Button
+        title={t('orders.sellerEntry')}
+        variant="secondary"
+        icon="receipt-outline"
+        onPress={() => router.push('/seller-orders')}
+      />
+      <Button
         title={t('sell.myListings')}
         variant="secondary"
         icon="list-outline"

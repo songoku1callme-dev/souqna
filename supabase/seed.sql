@@ -94,3 +94,87 @@ insert into listing_images (listing_id, url, position) values
   ('aaaaaaa1-0000-0000-0000-000000000004',
    'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800', 0)
 on conflict do nothing;
+
+-- -----------------------------------------------------------------------------
+-- Demo buyer profile
+-- -----------------------------------------------------------------------------
+-- Same caveat as sellers above: profiles references auth.users, so on a live
+-- project create the auth user first (or sign up through the app) and replace
+-- this id. Used as buyer_id for the demo orders below.
+insert into profiles (id, full_name, email, city_id, postal_code) values
+  ('bbbbbbb1-0000-0000-0000-000000000001', 'Layla H.', 'layla@example.com', 'damascus', '0010')
+on conflict (id) do nothing;
+
+-- -----------------------------------------------------------------------------
+-- Demo orders + shipment tracking
+-- -----------------------------------------------------------------------------
+-- Covers a spread of lifecycle states. Couriers are entered manually as local
+-- delivery companies (no global-carrier hardcoding); tracking_url alone is a
+-- valid tracking signal.
+insert into orders
+  (id, reference, buyer_id, seller_id, city_id, subtotal, currency, status,
+   estimated_delivery_at, delivered_at, issue_note, placed_at)
+values
+  -- preparing (no shipment yet)
+  ('ccccccc1-0000-0000-0000-000000000001', 'SQ-2026-1001',
+   'bbbbbbb1-0000-0000-0000-000000000001', '33333333-3333-3333-3333-333333333333',
+   'latakia', 28.00, 'USD', 'preparing',
+   now() + interval '5 days', null, null, now() - interval '2 days'),
+  -- out_for_delivery (manual local courier + tracking link)
+  ('ccccccc1-0000-0000-0000-000000000002', 'SQ-2026-1003',
+   'bbbbbbb1-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'damascus', 520.00, 'USD', 'out_for_delivery',
+   now() + interval '1 day', null, null, now() - interval '5 days'),
+  -- delivered
+  ('ccccccc1-0000-0000-0000-000000000003', 'SQ-2026-1004',
+   'bbbbbbb1-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222',
+   'aleppo', 65.00, 'USD', 'delivered',
+   now() - interval '1 day', now() - interval '1 day', null, now() - interval '9 days'),
+  -- issue_reported (moderation-friendly: preserved, not deleted)
+  ('ccccccc1-0000-0000-0000-000000000004', 'SQ-2026-1005',
+   'bbbbbbb1-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'damascus', 310.00, 'USD', 'issue_reported',
+   null, null, 'Item arrived with a cracked screen. Requesting a replacement.',
+   now() - interval '12 days')
+on conflict (id) do nothing;
+
+insert into order_items
+  (order_id, listing_id, title, image_url, unit_price, currency, quantity)
+values
+  ('ccccccc1-0000-0000-0000-000000000001', 'aaaaaaa1-0000-0000-0000-000000000003',
+   'Olive-wood serving bowl set', 'https://picsum.photos/seed/souqna-bowl-1/700/700', 28.00, 'USD', 1),
+  ('ccccccc1-0000-0000-0000-000000000002', 'aaaaaaa1-0000-0000-0000-000000000001',
+   'iPhone 13 — 128GB, excellent condition', 'https://picsum.photos/seed/souqna-iphone-1/700/700', 520.00, 'USD', 1),
+  ('ccccccc1-0000-0000-0000-000000000003', 'aaaaaaa1-0000-0000-0000-000000000002',
+   'Hand-embroidered abaya — handmade', 'https://picsum.photos/seed/souqna-abaya-1/700/700', 65.00, 'USD', 1),
+  ('ccccccc1-0000-0000-0000-000000000004', 'aaaaaaa1-0000-0000-0000-000000000004',
+   'Samsung 43" 4K Smart TV', 'https://picsum.photos/seed/souqna-tv-1/700/700', 310.00, 'USD', 1)
+on conflict do nothing;
+
+insert into order_status_history (order_id, status, created_at) values
+  ('ccccccc1-0000-0000-0000-000000000002', 'pending',          now() - interval '5 days'),
+  ('ccccccc1-0000-0000-0000-000000000002', 'confirmed',        now() - interval '4 days'),
+  ('ccccccc1-0000-0000-0000-000000000002', 'preparing',        now() - interval '4 days'),
+  ('ccccccc1-0000-0000-0000-000000000002', 'shipped',          now() - interval '2 days'),
+  ('ccccccc1-0000-0000-0000-000000000002', 'out_for_delivery', now() - interval '4 hours'),
+  ('ccccccc1-0000-0000-0000-000000000004', 'pending',          now() - interval '12 days'),
+  ('ccccccc1-0000-0000-0000-000000000004', 'confirmed',        now() - interval '11 days'),
+  ('ccccccc1-0000-0000-0000-000000000004', 'shipped',          now() - interval '8 days'),
+  ('ccccccc1-0000-0000-0000-000000000004', 'delivered',        now() - interval '6 days'),
+  ('ccccccc1-0000-0000-0000-000000000004', 'issue_reported',   now() - interval '5 days')
+on conflict do nothing;
+
+insert into shipments
+  (id, order_id, courier_name, provider_name, tracking_number, tracking_url,
+   status, estimated_delivery_at, note_to_buyer)
+values
+  ('ddddddd1-0000-0000-0000-000000000002', 'ccccccc1-0000-0000-0000-000000000002',
+   'Al-Fares Express', 'Al-Fares Logistics', 'AF-93817254',
+   'https://track.alfares.example/AF-93817254', 'out_for_delivery',
+   now() + interval '1 day', 'Driver will call before arriving. Please keep your phone reachable.')
+on conflict (id) do nothing;
+
+insert into shipment_updates (shipment_id, status, description, created_at) values
+  ('ddddddd1-0000-0000-0000-000000000002', 'in_transit',       'Picked up from seller', now() - interval '2 days'),
+  ('ddddddd1-0000-0000-0000-000000000002', 'out_for_delivery', 'Out for delivery in Damascus', now() - interval '4 hours')
+on conflict do nothing;

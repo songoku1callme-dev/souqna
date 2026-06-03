@@ -80,6 +80,12 @@ export default function ProfileScreen() {
 
       <Section title={t('profile.activitySection')}>
         <ListRow
+          icon="receipt-outline"
+          label={t('orders.buyerEntry')}
+          onPress={() => router.push('/orders')}
+        />
+        <Divider />
+        <ListRow
           icon="heart-outline"
           label={t('profile.savedItems')}
           value={favoritesCount > 0 ? String(favoritesCount) : undefined}

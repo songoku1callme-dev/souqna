@@ -36,3 +36,32 @@ export function formatTime(iso: string): string {
     return iso.slice(11, 16);
   }
 }
+
+/** Day + month + year, used for delivery dates / ETAs. */
+export function formatFullDate(iso: string): string {
+  const locale = i18n.language === 'ar' ? 'ar' : 'en';
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(iso));
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+/** Date + time, used for order/shipment timeline entries. */
+export function formatDateTime(iso: string): string {
+  const locale = i18n.language === 'ar' ? 'ar' : 'en';
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso));
+  } catch {
+    return iso.slice(0, 16).replace('T', ' ');
+  }
+}

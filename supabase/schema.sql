@@ -459,3 +459,198 @@ create policy "verification docs owner write" on storage.objects
     bucket_id = 'verification-docs'
     and split_part(name, '/', 1) = auth.uid()::text
   );
+
+-- =============================================================================
+-- Orders & shipment tracking
+-- =============================================================================
+-- Buyers place orders against a seller's listings; sellers manage fulfilment
+-- and attach shipment/tracking info. Local-courier friendly: courier_name,
+-- provider_name, tracking_number and tracking_url are all free-text/nullable so
+-- any regional delivery company works without a global-carrier API. Enum values
+-- mirror the app's TypeScript types in src/types/index.ts.
+
+-- Order lifecycle. cancelled/issue_reported are terminal off-ramps; the latter
+-- keeps order flows moderation-friendly (the order is preserved, not deleted).
+do $$ begin
+  create type order_status as enum (
+    'pending', 'confirmed', 'preparing', 'shipped',
+    'out_for_delivery', 'delivered', 'cancelled', 'issue_reported'
+  );
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  create type shipment_status as enum (
+    'pending', 'in_transit', 'out_for_delivery', 'delivered', 'exception'
+  );
+exception when duplicate_object then null; end $$;
+
+-- orders: one row per buyer purchase from a single seller.
+create table if not exists orders (
+  id                    uuid primary key default gen_random_uuid(),
+  reference             text not null unique,            -- human-friendly, e.g. SQ-2026-0008
+  buyer_id              uuid not null references profiles (id) on delete cascade,
+  seller_id             uuid not null references seller_profiles (id) on delete cascade,
+  city_id               text references cities (id) on delete set null,
+  subtotal              numeric(12, 2) not null default 0,
+  currency              text not null default 'USD',
+  status                order_status not null default 'pending',
+  estimated_delivery_at timestamptz,
+  delivered_at          timestamptz,
+  issue_note            text,                            -- buyer-raised issue (moderation-friendly)
+  placed_at             timestamptz not null default now(),
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+);
+
+-- order_items: line items snapshotting listing data at purchase time.
+create table if not exists order_items (
+  id          uuid primary key default gen_random_uuid(),
+  order_id    uuid not null references orders (id) on delete cascade,
+  listing_id  uuid references listings (id) on delete set null,
+  title       text not null,
+  image_url   text,
+  unit_price  numeric(12, 2) not null default 0,
+  currency    text not null default 'USD',
+  quantity    int not null default 1 check (quantity > 0),
+  created_at  timestamptz not null default now()
+);
+
+-- order_status_history: append-only audit trail of order status transitions.
+create table if not exists order_status_history (
+  id         uuid primary key default gen_random_uuid(),
+  order_id   uuid not null references orders (id) on delete cascade,
+  status     order_status not null,
+  note       text,
+  created_at timestamptz not null default now()
+);
+
+-- shipments: 1:1-ish with an order (a seller may re-issue, latest wins in UI).
+create table if not exists shipments (
+  id                    uuid primary key default gen_random_uuid(),
+  order_id              uuid not null references orders (id) on delete cascade,
+  courier_name          text,                  -- manual local courier (no hardcoded carrier)
+  provider_name         text,                  -- optional shipping provider/brand
+  tracking_number       text,
+  tracking_url          text,                  -- may be the only tracking signal available
+  status                shipment_status not null default 'pending',
+  estimated_delivery_at timestamptz,
+  delivered_at          timestamptz,
+  note_to_buyer         text,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+);
+
+-- shipment_updates: append-only scan/status history for a shipment.
+create table if not exists shipment_updates (
+  id          uuid primary key default gen_random_uuid(),
+  shipment_id uuid not null references shipments (id) on delete cascade,
+  status      shipment_status not null,
+  description text,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_orders_buyer    on orders (buyer_id, updated_at desc);
+create index if not exists idx_orders_seller   on orders (seller_id, updated_at desc);
+create index if not exists idx_order_items_ord on order_items (order_id);
+create index if not exists idx_order_hist_ord  on order_status_history (order_id, created_at);
+create index if not exists idx_shipments_ord   on shipments (order_id);
+create index if not exists idx_ship_updates    on shipment_updates (shipment_id, created_at);
+
+drop trigger if exists trg_orders_updated_at on orders;
+create trigger trg_orders_updated_at before update on orders
+  for each row execute function set_updated_at();
+
+drop trigger if exists trg_shipments_updated_at on shipments;
+create trigger trg_shipments_updated_at before update on shipments
+  for each row execute function set_updated_at();
+
+-- -----------------------------------------------------------------------------
+-- Orders RLS
+-- -----------------------------------------------------------------------------
+alter table orders               enable row level security;
+alter table order_items          enable row level security;
+alter table order_status_history enable row level security;
+alter table shipments            enable row level security;
+alter table shipment_updates     enable row level security;
+
+-- An order is visible to its buyer, its seller, or an admin.
+-- Seller match resolves seller_profiles.user_id = auth.uid().
+create policy "orders buyer or seller read" on orders
+  for select using (
+    auth.uid() = buyer_id
+    or seller_id in (select id from seller_profiles where user_id = auth.uid())
+    or is_admin()
+  );
+-- Buyers create their own orders.
+create policy "orders buyer create" on orders
+  for insert with check (auth.uid() = buyer_id);
+-- Buyers may update their own order (e.g. raise an issue); sellers update orders
+-- they fulfil (status, ETA); admins manage all.
+create policy "orders buyer update" on orders
+  for update using (auth.uid() = buyer_id);
+create policy "orders seller update" on orders
+  for update using (
+    seller_id in (select id from seller_profiles where user_id = auth.uid())
+  );
+create policy "orders admin manage" on orders for all using (is_admin());
+
+-- Child rows inherit visibility from their parent order.
+create policy "order_items read" on order_items
+  for select using (
+    exists (select 1 from orders o where o.id = order_id
+            and (auth.uid() = o.buyer_id
+                 or o.seller_id in (select id from seller_profiles where user_id = auth.uid())
+                 or is_admin()))
+  );
+create policy "order_items seller write" on order_items
+  for all using (
+    exists (select 1 from orders o where o.id = order_id
+            and o.seller_id in (select id from seller_profiles where user_id = auth.uid()))
+  );
+
+create policy "order_status_history read" on order_status_history
+  for select using (
+    exists (select 1 from orders o where o.id = order_id
+            and (auth.uid() = o.buyer_id
+                 or o.seller_id in (select id from seller_profiles where user_id = auth.uid())
+                 or is_admin()))
+  );
+create policy "order_status_history write" on order_status_history
+  for insert with check (
+    exists (select 1 from orders o where o.id = order_id
+            and (auth.uid() = o.buyer_id
+                 or o.seller_id in (select id from seller_profiles where user_id = auth.uid())))
+  );
+
+create policy "shipments read" on shipments
+  for select using (
+    exists (select 1 from orders o where o.id = order_id
+            and (auth.uid() = o.buyer_id
+                 or o.seller_id in (select id from seller_profiles where user_id = auth.uid())
+                 or is_admin()))
+  );
+-- Only the fulfilling seller (or admin) can attach/update shipment + tracking.
+create policy "shipments seller write" on shipments
+  for all using (
+    exists (select 1 from orders o where o.id = order_id
+            and o.seller_id in (select id from seller_profiles where user_id = auth.uid()))
+    or is_admin()
+  );
+
+create policy "shipment_updates read" on shipment_updates
+  for select using (
+    exists (select 1 from shipments s
+            join orders o on o.id = s.order_id
+            where s.id = shipment_id
+            and (auth.uid() = o.buyer_id
+                 or o.seller_id in (select id from seller_profiles where user_id = auth.uid())
+                 or is_admin()))
+  );
+create policy "shipment_updates seller write" on shipment_updates
+  for all using (
+    exists (select 1 from shipments s
+            join orders o on o.id = s.order_id
+            where s.id = shipment_id
+            and o.seller_id in (select id from seller_profiles where user_id = auth.uid()))
+    or is_admin()
+  );

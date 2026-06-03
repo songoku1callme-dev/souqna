@@ -135,6 +135,110 @@ export type Report = {
   createdAt: string;
 };
 
+/* ------------------------------------------------------------------ *
+ * Orders & shipment tracking
+ * Mirrors the orders/order_items/order_status_history/shipments/
+ * shipment_updates tables in supabase/schema.sql. RLS-aware and built so
+ * any local courier can be entered manually (no carrier hardcoding).
+ * ------------------------------------------------------------------ */
+
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'preparing'
+  | 'shipped'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'cancelled'
+  | 'issue_reported';
+
+/** Order lifecycle in display order; cancelled/issue_reported are terminal off-ramps. */
+export const ORDER_FLOW: OrderStatus[] = [
+  'pending',
+  'confirmed',
+  'preparing',
+  'shipped',
+  'out_for_delivery',
+  'delivered',
+];
+
+export type ShipmentStatus =
+  | 'pending'
+  | 'in_transit'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'exception';
+
+export type OrderItem = {
+  id: string;
+  orderId: string;
+  listingId: string;
+  title: string;
+  imageUrl?: string;
+  unitPrice: number;
+  currency: string;
+  quantity: number;
+};
+
+export type OrderStatusEvent = {
+  id: string;
+  orderId: string;
+  status: OrderStatus;
+  note?: string;
+  createdAt: string;
+};
+
+export type ShipmentUpdate = {
+  id: string;
+  shipmentId: string;
+  status: ShipmentStatus;
+  description?: string;
+  createdAt: string;
+};
+
+export type Shipment = {
+  id: string;
+  orderId: string;
+  /** Manually entered local courier (e.g. a regional logistics company). */
+  courierName?: string;
+  /** Optional shipping provider/brand name. */
+  provider?: string;
+  trackingNumber?: string;
+  /** External tracking link; may be the only tracking signal available. */
+  trackingUrl?: string;
+  status: ShipmentStatus;
+  estimatedDeliveryAt?: string;
+  deliveredAt?: string;
+  noteToBuyer?: string;
+  updates: ShipmentUpdate[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Order = {
+  id: string;
+  /** Human-friendly reference shown to users, e.g. SQ-2026-0008. */
+  reference: string;
+  buyerId: string;
+  buyerName: string;
+  sellerId: string;
+  sellerName: string;
+  sellerVerified: boolean;
+  cityId?: string;
+  items: OrderItem[];
+  subtotal: number;
+  currency: string;
+  status: OrderStatus;
+  statusHistory: OrderStatusEvent[];
+  shipment?: Shipment;
+  estimatedDeliveryAt?: string;
+  deliveredAt?: string;
+  /** Free-text issue raised by the buyer; keeps order flows moderation-friendly. */
+  issueNote?: string;
+  placedAt: string;
+  updatedAt: string;
+};
+
 export type SortOption = 'newest' | 'price_low' | 'price_high' | 'nearest';
 
 export type ListingFilters = {
