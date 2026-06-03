@@ -4,11 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { useListings } from '@/api/hooks';
 import { FilterSheet } from '@/components/FilterSheet';
-import { ListingsGrid } from '@/components/ListingsGrid';
+import { ListingsFeed } from '@/components/ListingsFeed';
 import { SortSheet } from '@/components/SortSheet';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -24,40 +22,27 @@ export default function CategoryScreen() {
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const query = useListings(filters);
+
+  const header = (
+    <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+      <Control
+        icon="options-outline"
+        label={t('search.filters')}
+        onPress={() => setFilterOpen(true)}
+      />
+      <Control
+        icon="swap-vertical-outline"
+        label={t('search.sort')}
+        onPress={() => setSortOpen(true)}
+      />
+    </View>
+  );
 
   return (
-    <Screen scroll contentContainerStyle={{ gap: theme.spacing.lg }}>
+    <Screen scroll={false} padded={false}>
       <Stack.Screen options={{ title: t(`categories.${slug}`) }} />
 
-      <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-        <Control
-          icon="options-outline"
-          label={t('search.filters')}
-          onPress={() => setFilterOpen(true)}
-        />
-        <Control
-          icon="swap-vertical-outline"
-          label={t('search.sort')}
-          onPress={() => setSortOpen(true)}
-        />
-      </View>
-
-      {!query.isLoading && query.data ? (
-        <Text variant="label" color="textMuted">
-          {t('search.results', { count: query.data.length })}
-        </Text>
-      ) : null}
-
-      {!query.isLoading && query.data && query.data.length === 0 ? (
-        <EmptyState
-          icon="cube-outline"
-          title={t('empty.noListings')}
-          body={t('empty.noListingsBody')}
-        />
-      ) : (
-        <ListingsGrid listings={query.data} loading={query.isLoading} />
-      )}
+      <ListingsFeed filters={filters} header={header} />
 
       <FilterSheet
         visible={filterOpen}

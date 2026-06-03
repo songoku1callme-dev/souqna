@@ -1,10 +1,17 @@
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import type { Conversation, Listing, Message, SellerSummary, ListingFilters } from '@/types';
 import { fetchConversations, fetchMessages, sendMessage } from './conversationsApi';
 import {
   fetchListing,
   fetchListings,
+  fetchListingsPage,
   fetchNewestListings,
   fetchPopularNearby,
   fetchRelatedListings,
@@ -15,6 +22,16 @@ import { fetchFeaturedSellers, fetchSeller } from './sellersApi';
 
 export function useListings(filters: ListingFilters = {}): UseQueryResult<Listing[]> {
   return useQuery({ queryKey: queryKeys.listings(filters), queryFn: () => fetchListings(filters) });
+}
+
+/** Paginated listings for the browse feeds (search + category). */
+export function useInfiniteListings(filters: ListingFilters = {}) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.listings(filters),
+    queryFn: ({ pageParam }) => fetchListingsPage(filters, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextPage,
+  });
 }
 
 export function useNewestListings() {

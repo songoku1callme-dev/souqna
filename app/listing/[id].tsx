@@ -54,6 +54,18 @@ export default function ListingDetail() {
     );
   }
 
+  if (listing.isError) {
+    return (
+      <EmptyState
+        icon="cloud-offline-outline"
+        title={t('errors.generic')}
+        body={t('errors.genericBody')}
+        actionLabel={t('common.retry')}
+        onAction={() => void listing.refetch()}
+      />
+    );
+  }
+
   if (!listing.data) {
     return (
       <EmptyState

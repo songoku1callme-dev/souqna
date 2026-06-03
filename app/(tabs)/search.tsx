@@ -3,15 +3,14 @@ import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 
-import { useListings } from '@/api/hooks';
 import { FilterSheet } from '@/components/FilterSheet';
 import { Header } from '@/components/Header';
-import { ListingsGrid } from '@/components/ListingsGrid';
+import { ListingsFeed } from '@/components/ListingsFeed';
 import { SortSheet } from '@/components/SortSheet';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useTheme } from '@/theme/ThemeProvider';
 import type { ListingFilters } from '@/types';
 
@@ -31,20 +30,26 @@ export default function SearchScreen() {
   const theme = useTheme();
   const { t } = useTranslation();
   const [filters, setFilters] = useState<ListingFilters>({ sort: 'newest' });
+  const [searchText, setSearchText] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
 
-  const query = useListings(filters);
+  // Debounce the query so live reads don't refire on every keystroke.
+  const debouncedQuery = useDebouncedValue(searchText.trim(), 350);
   const activeCount = useMemo(() => countActiveFilters(filters), [filters]);
+  const effectiveFilters = useMemo<ListingFilters>(
+    () => ({ ...filters, query: debouncedQuery || undefined }),
+    [filters, debouncedQuery],
+  );
 
-  return (
-    <Screen scroll edges={['top']} contentContainerStyle={{ gap: theme.spacing.lg }}>
+  const header = (
+    <View style={{ gap: theme.spacing.lg }}>
       <Header title={t('search.title')} />
 
       <Input
         placeholder={t('search.placeholder')}
-        value={filters.query ?? ''}
-        onChangeText={(v) => setFilters((f) => ({ ...f, query: v }))}
+        value={searchText}
+        onChangeText={setSearchText}
         icon="search"
         autoCapitalize="none"
         returnKeyType="search"
@@ -63,23 +68,22 @@ export default function SearchScreen() {
           onPress={() => setSortOpen(true)}
         />
       </View>
+    </View>
+  );
 
-      {!query.isLoading && query.data ? (
-        <Text variant="label" color="textMuted">
-          {t('search.results', { count: query.data.length })}
-        </Text>
-      ) : null}
-
-      {!query.isLoading && query.data && query.data.length === 0 ? (
-        <EmptyState
-          icon="search-outline"
-          title={t('search.noResults')}
-          actionLabel={t('search.clearFilters')}
-          onAction={() => setFilters({ sort: filters.sort, query: filters.query })}
-        />
-      ) : (
-        <ListingsGrid listings={query.data} loading={query.isLoading} />
-      )}
+  return (
+    <Screen scroll={false} padded={false} edges={['top']}>
+      <ListingsFeed
+        filters={effectiveFilters}
+        header={header}
+        emptyTitle={t('search.noResults')}
+        emptyBody={t('empty.noListingsBody')}
+        emptyActionLabel={t('search.clearFilters')}
+        onEmptyAction={() => {
+          setFilters({ sort: filters.sort });
+          setSearchText('');
+        }}
+      />
 
       <FilterSheet
         visible={filterOpen}
