@@ -288,6 +288,12 @@
   "profile": {
     "title": "حسابي",
     "guestTitle": "زائر",
+    "sellingSection": "البيع",
+    "activitySection": "النشاط",
+    "preferencesSection": "التفضيلات",
+    "supportSection": "الدعم والقانوني",
+    "logout": "تسجيل الخروج",
+    "loggedOut": "تم تسجيل الخروج",
     "editProfile": "تعديل الملف",
     "account": "الحساب",
     "accountInfo": "معلومات الحساب",
