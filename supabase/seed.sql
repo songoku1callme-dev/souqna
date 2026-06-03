@@ -8,7 +8,10 @@
 -- backing auth user (user_id is set to a fixed demo UUID). On a real project,
 -- create the auth users first (or sign up through the app) and replace the
 -- user_id values below. The app ships with local mocks, so this seed is for
--- when you wire up a live Supabase project.
+-- a LOCAL Postgres where you can create matching auth users.
+--
+-- For a live dev/prod Supabase project, run supabase/seed_reference.sql
+-- instead — it contains only cities + categories (no auth.users dependency).
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------

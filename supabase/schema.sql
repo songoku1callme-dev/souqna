@@ -18,6 +18,11 @@
 -- triggers → RLS policies → storage. Seed data lives in seed.sql.
 -- =============================================================================
 
+-- Helper functions (e.g. is_admin) are defined before the tables they query,
+-- so defer function-body validation until the whole script has run. This is
+-- the same approach pg_dump uses and lets this file apply cleanly in one pass.
+set check_function_bodies = off;
+
 -- -----------------------------------------------------------------------------
 -- Extensions
 -- -----------------------------------------------------------------------------
