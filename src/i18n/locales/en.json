@@ -288,6 +288,12 @@
   "profile": {
     "title": "Profile",
     "guestTitle": "Guest",
+    "sellingSection": "Selling",
+    "activitySection": "Activity",
+    "preferencesSection": "Preferences",
+    "supportSection": "Support & legal",
+    "logout": "Log out",
+    "loggedOut": "Logged out",
     "editProfile": "Edit profile",
     "account": "Account",
     "accountInfo": "Account info",
