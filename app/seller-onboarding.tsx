@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { useSubmitVerification } from '@/api/hooks';
+import { env } from '@/config/env';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Chip } from '@/components/ui/Chip';
@@ -31,6 +34,7 @@ export default function SellerOnboarding() {
   const user = useAuthStore((s) => s.user);
   const defaultCity = useLocationStore((s) => s.cityId);
   const submitApplication = useSellerStore((s) => s.submitApplication);
+  const submitVerification = useSubmitVerification();
 
   const [displayName, setDisplayName] = useState(user?.fullName ?? '');
   const [legalName, setLegalName] = useState('');
@@ -39,9 +43,19 @@ export default function SellerOnboarding() {
   const [cityId, setCityId] = useState<string | null>(defaultCity);
   const [postalCode, setPostalCode] = useState('');
   const [categorySlugs, setCategorySlugs] = useState<CategorySlug[]>([]);
-  const [idUploaded, setIdUploaded] = useState(false);
-  const [docsUploaded, setDocsUploaded] = useState(false);
+  const [idDocUris, setIdDocUris] = useState<string[]>([]);
+  const [businessDocUris, setBusinessDocUris] = useState<string[]>([]);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  const pickDocs = async (onPicked: (uris: string[]) => void) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 3,
+      quality: 0.7,
+    });
+    if (!result.canceled) onPicked(result.assets.map((a) => a.uri));
+  };
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const cityOptions = CITIES.map((c) => ({ value: c.id, label: c.name[lang] }));
@@ -51,7 +65,7 @@ export default function SellerOnboarding() {
       prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug],
     );
 
-  const submit = () => {
+  const submit = async () => {
     const nextErrors: Record<string, string> = {};
     const nameError = validateRequired(displayName);
     const phoneError = validateRequired(phone);
@@ -60,6 +74,7 @@ export default function SellerOnboarding() {
     if (phoneError) nextErrors.phone = phoneError;
     if (emailError) nextErrors.email = emailError;
     if (!cityId) nextErrors.city = 'validation.required';
+    if (idDocUris.length === 0) nextErrors.idDoc = 'sell.form.idRequired';
     if (!acceptedTerms) nextErrors.terms = 'validation.mustAcceptTerms';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -67,6 +82,8 @@ export default function SellerOnboarding() {
       return;
     }
 
+    // Mock mode persists status through the local seller store so the gate
+    // updates immediately; live mode writes to Supabase + uploads documents.
     submitApplication({
       displayName: displayName.trim(),
       legalName: legalName.trim(),
@@ -75,10 +92,30 @@ export default function SellerOnboarding() {
       cityId,
       postalCode: postalCode.trim(),
       categorySlugs,
-      idDocumentName: idUploaded ? 'id-document.jpg' : undefined,
-      verificationDocNames: docsUploaded ? ['business-doc.pdf'] : [],
+      idDocumentName: idDocUris[0],
+      verificationDocNames: businessDocUris,
       acceptedTerms,
     });
+
+    if (!env.useMocks) {
+      try {
+        await submitVerification.mutateAsync({
+          displayName: displayName.trim(),
+          legalName: legalName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          cityId,
+          postalCode: postalCode.trim(),
+          categorySlugs,
+          acceptedTerms,
+          documentUris: [...idDocUris, ...businessDocUris],
+        });
+      } catch {
+        toast.error(t('sell.form.submitFailed'));
+        return;
+      }
+    }
+
     toast.success(t('sell.form.submitted'));
     router.back();
   };
@@ -162,13 +199,18 @@ export default function SellerOnboarding() {
           <Text variant="label">{t('sell.form.verificationDocs')}</Text>
           <UploadButton
             label={t('sell.form.uploadId')}
-            done={idUploaded}
-            onPress={() => setIdUploaded(true)}
+            count={idDocUris.length}
+            onPress={() => void pickDocs(setIdDocUris)}
           />
+          {errors.idDoc ? (
+            <Text variant="caption" color="danger">
+              {t(errors.idDoc)}
+            </Text>
+          ) : null}
           <UploadButton
             label={t('sell.form.uploadDocs')}
-            done={docsUploaded}
-            onPress={() => setDocsUploaded(true)}
+            count={businessDocUris.length}
+            onPress={() => void pickDocs(setBusinessDocUris)}
           />
         </View>
 
@@ -185,7 +227,9 @@ export default function SellerOnboarding() {
 
         <Button
           title={t('sell.form.submit')}
-          onPress={submit}
+          onPress={() => void submit()}
+          loading={submitVerification.isPending}
+          disabled={submitVerification.isPending}
           style={{ marginTop: theme.spacing.sm }}
         />
       </Screen>
@@ -195,15 +239,16 @@ export default function SellerOnboarding() {
 
 function UploadButton({
   label,
-  done,
+  count,
   onPress,
 }: {
   label: string;
-  done: boolean;
+  count: number;
   onPress: () => void;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
+  const done = count > 0;
   return (
     <Pressable
       onPress={onPress}
@@ -228,7 +273,7 @@ function UploadButton({
         {label}
       </Text>
       <Text variant="caption" color={done ? 'primary' : 'textMuted'}>
-        {done ? t('sell.form.uploaded') : t('common.optional')}
+        {done ? t('sell.form.uploadedCount', { count }) : t('common.optional')}
       </Text>
     </Pressable>
   );
