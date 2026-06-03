@@ -13,6 +13,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { SellerCard } from '@/components/SellerCard';
 import { TrustBanner } from '@/components/TrustBanner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { InlineError } from '@/components/ui/InlineError';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { useFeaturedSellers, useNewestListings, usePopularNearby } from '@/api/hooks';
@@ -68,7 +69,9 @@ export default function HomeScreen() {
 
       <View>
         <SectionHeader title={t('home.featuredSellers')} />
-        {sellers.isLoading ? (
+        {sellers.isError ? (
+          <InlineError onRetry={() => void sellers.refetch()} />
+        ) : sellers.isLoading ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -95,22 +98,28 @@ export default function HomeScreen() {
           title={t('home.newestListings')}
           onSeeAll={() => router.push('/(tabs)/search')}
         />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: theme.spacing.md }}
-        >
-          {newest.isLoading
-            ? [0, 1, 2].map((i) => <ListingCardSkeleton key={i} variant="carousel" />)
-            : newest.data?.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} variant="carousel" />
-              ))}
-        </ScrollView>
+        {newest.isError ? (
+          <InlineError onRetry={() => void newest.refetch()} />
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: theme.spacing.md }}
+          >
+            {newest.isLoading
+              ? [0, 1, 2].map((i) => <ListingCardSkeleton key={i} variant="carousel" />)
+              : newest.data?.map((listing) => (
+                  <ListingCard key={listing.id} listing={listing} variant="carousel" />
+                ))}
+          </ScrollView>
+        )}
       </View>
 
       <View>
         <SectionHeader title={t('home.popularNearby')} />
-        {popular.isLoading ? (
+        {popular.isError ? (
+          <InlineError onRetry={() => void popular.refetch()} />
+        ) : popular.isLoading ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}>
             {[0, 1, 2, 3].map((i) => (
               <View key={i} style={{ width: '47%', flexGrow: 1 }}>

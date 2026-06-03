@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { IconButton } from '@/components/ui/IconButton';
+import { InlineError } from '@/components/ui/InlineError';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
@@ -27,6 +28,20 @@ export default function SellerProfile() {
   const seller = useSeller(id);
   const listings = useSellerListings(id);
   const [reportOpen, setReportOpen] = useState(false);
+
+  if (seller.isError) {
+    return (
+      <Screen>
+        <EmptyState
+          icon="cloud-offline-outline"
+          title={t('errors.generic')}
+          body={t('errors.genericBody')}
+          actionLabel={t('common.retry')}
+          onAction={() => void seller.refetch()}
+        />
+      </Screen>
+    );
+  }
 
   if (!seller.isLoading && !seller.data) {
     return (
@@ -85,7 +100,9 @@ export default function SellerProfile() {
 
       <View>
         <SectionHeader title={t('seller.listings')} />
-        {!listings.isLoading && listings.data && listings.data.length === 0 ? (
+        {listings.isError ? (
+          <InlineError onRetry={() => void listings.refetch()} />
+        ) : !listings.isLoading && listings.data && listings.data.length === 0 ? (
           <EmptyState icon="cube-outline" title={t('empty.noListings')} />
         ) : (
           <ListingsGrid listings={listings.data} loading={listings.isLoading} />
