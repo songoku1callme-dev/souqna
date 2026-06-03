@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { loadProfileForAuthUser } from '@/api/profileApi';
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
 import type { Profile, UserRole } from '@/types';
@@ -52,17 +53,8 @@ export const useAuthStore = create<AuthState>()(
         const { data } = await supabase.auth.getSession();
         const sessionUser = data.session?.user;
         if (sessionUser) {
-          set({
-            user: {
-              id: sessionUser.id,
-              fullName: (sessionUser.user_metadata?.full_name as string) ?? '',
-              email: sessionUser.email ?? '',
-              roles: ['buyer'],
-              createdAt: sessionUser.created_at ?? new Date().toISOString(),
-            },
-            status: 'authenticated',
-            initialized: true,
-          });
+          const user = await loadProfileForAuthUser(sessionUser);
+          set({ user, status: 'authenticated', initialized: true });
         } else {
           set({ initialized: true });
         }
@@ -76,16 +68,8 @@ export const useAuthStore = create<AuthState>()(
         }
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error || !data.user) return { ok: false, error: 'errors.signInFailed' };
-        set({
-          user: {
-            id: data.user.id,
-            fullName: (data.user.user_metadata?.full_name as string) ?? '',
-            email: data.user.email ?? email,
-            roles: ['buyer'],
-            createdAt: data.user.created_at ?? new Date().toISOString(),
-          },
-          status: 'authenticated',
-        });
+        const user = await loadProfileForAuthUser(data.user);
+        set({ user, status: 'authenticated' });
         return { ok: true };
       },
 
@@ -102,16 +86,8 @@ export const useAuthStore = create<AuthState>()(
         });
         if (error) return { ok: false, error: 'errors.signUpFailed' };
         if (data.user) {
-          set({
-            user: {
-              id: data.user.id,
-              fullName,
-              email,
-              roles: ['buyer'],
-              createdAt: data.user.created_at ?? new Date().toISOString(),
-            },
-            status: 'authenticated',
-          });
+          const user = await loadProfileForAuthUser(data.user);
+          set({ user, status: 'authenticated' });
         }
         return { ok: true };
       },
