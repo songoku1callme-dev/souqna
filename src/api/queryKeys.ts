@@ -10,4 +10,5 @@ export const queryKeys = {
   related: (id: string) => ['listing', id, 'related'] as const,
   conversations: ['conversations'] as const,
   messages: (id: string) => ['messages', id] as const,
+  mySellerProfile: ['seller', 'me'] as const,
 };

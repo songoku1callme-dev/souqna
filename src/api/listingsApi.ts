@@ -1,6 +1,6 @@
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
-import { LISTINGS, getListingById } from '@/data/listings';
+import { LISTINGS, addMockListing, getListingById } from '@/data/listings';
 import type {
   CategorySlug,
   Listing,
@@ -11,6 +11,34 @@ import type {
   SellerSummary,
 } from '@/types';
 import { delay } from './client';
+import { fetchMySellerProfile } from './sellersApi';
+import { uploadListingImages } from './storageApi';
+
+/** Fields a seller provides when creating a listing. */
+export type CreateListingInput = {
+  title: string;
+  description: string;
+  categorySlug: CategorySlug;
+  price: number;
+  currency: string;
+  condition: ListingCondition;
+  cityId: string;
+  postalCode?: string;
+  delivery: boolean;
+  pickup: boolean;
+  /** Local image URIs (from the picker) to upload, in display order. */
+  imageUris: string[];
+  /** Publish immediately (`active`) or keep as a `draft`. */
+  publish: boolean;
+};
+
+/** Raised when a non-verified seller attempts to publish. */
+export class SellerNotVerifiedError extends Error {
+  constructor() {
+    super('seller_not_verified');
+    this.name = 'SellerNotVerifiedError';
+  }
+}
 
 /** Number of listings fetched per page in the infinite browse feeds. */
 export const LISTINGS_PAGE_SIZE = 12;
@@ -197,6 +225,86 @@ export async function fetchListingsPage(
 export async function fetchListings(filters: ListingFilters = {}): Promise<Listing[]> {
   const page = await fetchListingsPage(filters, 0, 100);
   return page.items;
+}
+
+/**
+ * Create a listing (with image upload). Only verified sellers may publish.
+ *
+ * Live: resolves the caller's seller profile, inserts the listing row, uploads
+ * photos to Storage, then inserts `listing_images` rows. Mock: builds a Listing
+ * and prepends it to the in-memory feed so it appears immediately.
+ */
+export async function createListing(input: CreateListingInput): Promise<Listing> {
+  if (env.useMocks || !supabase) {
+    const now = new Date().toISOString();
+    const id = `lst-local-${Date.now()}`;
+    const seller: SellerSummary = {
+      id: 'seller-me',
+      displayName: 'You',
+      status: 'verified',
+      cityId: input.cityId,
+      createdAt: now,
+    };
+    const listing: Listing = {
+      id,
+      sellerId: seller.id,
+      title: input.title,
+      description: input.description,
+      categorySlug: input.categorySlug,
+      price: input.price,
+      currency: input.currency,
+      condition: input.condition,
+      cityId: input.cityId,
+      postalCode: input.postalCode,
+      images: input.imageUris,
+      delivery: input.delivery,
+      pickup: input.pickup,
+      status: input.publish ? 'active' : 'draft',
+      createdAt: now,
+      seller,
+    };
+    addMockListing(listing);
+    return delay(listing);
+  }
+
+  const sellerProfile = await fetchMySellerProfile();
+  if (!sellerProfile) throw new SellerNotVerifiedError();
+  if (input.publish && sellerProfile.status !== 'verified') {
+    throw new SellerNotVerifiedError();
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('listings')
+    .insert({
+      seller_id: sellerProfile.id,
+      title: input.title,
+      description: input.description,
+      category_slug: input.categorySlug,
+      price: input.price,
+      currency: input.currency,
+      condition: input.condition,
+      city_id: input.cityId,
+      postal_code: input.postalCode ?? null,
+      delivery: input.delivery,
+      pickup: input.pickup,
+      status: input.publish ? 'active' : 'draft',
+    })
+    .select('id')
+    .single();
+  if (insertError) throw insertError;
+
+  const listingId = (inserted as { id: string }).id;
+
+  if (input.imageUris.length > 0) {
+    const urls = await uploadListingImages(sellerProfile.id, listingId, input.imageUris);
+    const rows = urls.map((url, position) => ({ listing_id: listingId, url, position }));
+    const { error: imageError } = await supabase.from('listing_images').insert(rows);
+    if (imageError) throw imageError;
+  }
+
+  const created = await fetchListing(listingId);
+  if (!created) throw new Error('Listing created but could not be loaded.');
+  return created;
 }
 
 export async function fetchListing(id: string): Promise<Listing | null> {

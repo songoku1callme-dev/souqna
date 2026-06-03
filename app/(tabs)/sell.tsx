@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
+import { useMySellerProfile } from '@/api/hooks';
+import { env } from '@/config/env';
 import { useIsAuthenticated } from '@/store/authStore';
 import { useSellerStore } from '@/store/sellerStore';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -23,7 +25,9 @@ const BENEFITS: { icon: keyof typeof Ionicons.glyphMap; key: string }[] = [
 export default function SellScreen() {
   const { t } = useTranslation();
   const isAuthenticated = useIsAuthenticated();
-  const status = useSellerStore((s) => s.status);
+  const mockStatus = useSellerStore((s) => s.status);
+  const liveProfile = useMySellerProfile(!env.useMocks && isAuthenticated);
+  const status = env.useMocks ? mockStatus : (liveProfile.data?.status ?? 'not_submitted');
 
   return (
     <Screen scroll edges={['top']} contentContainerStyle={{ gap: 20 }}>

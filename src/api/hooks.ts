@@ -6,9 +6,17 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
-import type { Conversation, Listing, Message, SellerSummary, ListingFilters } from '@/types';
+import type {
+  Conversation,
+  Listing,
+  Message,
+  SellerProfile,
+  SellerSummary,
+  ListingFilters,
+} from '@/types';
 import { fetchConversations, fetchMessages, sendMessage } from './conversationsApi';
 import {
+  createListing,
   fetchListing,
   fetchListings,
   fetchListingsPage,
@@ -16,9 +24,16 @@ import {
   fetchPopularNearby,
   fetchRelatedListings,
   fetchSellerListings,
+  type CreateListingInput,
 } from './listingsApi';
 import { queryKeys } from './queryKeys';
-import { fetchFeaturedSellers, fetchSeller } from './sellersApi';
+import {
+  fetchFeaturedSellers,
+  fetchMySellerProfile,
+  fetchSeller,
+  submitSellerVerification,
+  type SellerVerificationInput,
+} from './sellersApi';
 
 export function useListings(filters: ListingFilters = {}): UseQueryResult<Listing[]> {
   return useQuery({ queryKey: queryKeys.listings(filters), queryFn: () => fetchListings(filters) });
@@ -89,6 +104,38 @@ export function useSendMessage(conversationId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+    },
+  });
+}
+
+/** Live seller profile (status) for the current user; `null` in mock mode. */
+export function useMySellerProfile(enabled = true): UseQueryResult<SellerProfile | null> {
+  return useQuery({
+    queryKey: queryKeys.mySellerProfile,
+    queryFn: fetchMySellerProfile,
+    enabled,
+  });
+}
+
+/** Create a listing, then refresh the browse/home feeds so it appears. */
+export function useCreateListing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateListingInput) => createListing(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['listings'] });
+      void queryClient.invalidateQueries({ queryKey: ['popular'] });
+    },
+  });
+}
+
+/** Submit a seller verification request (uploads docs in live mode). */
+export function useSubmitVerification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SellerVerificationInput) => submitSellerVerification(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mySellerProfile });
     },
   });
 }

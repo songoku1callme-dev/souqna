@@ -241,7 +241,10 @@
       "submitted": "Application submitted — we'll review it shortly.",
       "intro": "Verified sellers earn buyer trust. Share a few details to get started — documents are optional in this demo.",
       "verificationDocs": "Verification documents",
-      "uploaded": "Uploaded"
+      "uploaded": "Uploaded",
+      "idRequired": "Please upload an identity document.",
+      "submitFailed": "Could not submit your request. Please try again.",
+      "uploadedCount": "{{count}} added"
     }
   },
   "createListing": {
@@ -267,7 +270,10 @@
     "saveDraft": "Save draft",
     "publish": "Publish listing",
     "published": "Your listing is live!",
-    "draftSaved": "Draft saved"
+    "draftSaved": "Draft saved",
+    "verificationRequired": "Your seller account must be verified before you can publish a listing.",
+    "imagesRequired": "Add at least one photo to publish.",
+    "submitFailed": "Could not save your listing. Please try again."
   },
   "inbox": {
     "title": "Inbox",

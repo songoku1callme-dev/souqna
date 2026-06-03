@@ -265,3 +265,11 @@ export const LISTINGS: Listing[] = RAW_LISTINGS.map((l) => ({
 export function getListingById(id: string): Listing | undefined {
   return LISTINGS.find((l) => l.id === id);
 }
+
+/**
+ * Prepend a newly-created listing to the in-memory mock feed so it shows up
+ * immediately in mock mode (mirrors a live insert appearing in the feed).
+ */
+export function addMockListing(listing: Listing): void {
+  LISTINGS.unshift(listing);
+}

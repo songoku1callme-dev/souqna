@@ -1,20 +1,26 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Switch, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { useCreateListing, useMySellerProfile } from '@/api/hooks';
+import { SellerNotVerifiedError } from '@/api/listingsApi';
 import { ImageUploadGrid } from '@/components/ImageUploadGrid';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
 import { PickerField } from '@/components/ui/PickerField';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { useToast } from '@/components/ui/Toast';
+import { env } from '@/config/env';
 import { CATEGORIES } from '@/data/categories';
 import { CITIES } from '@/data/cities';
 import { useLocale } from '@/hooks/useLocale';
 import { useLocationStore } from '@/store/locationStore';
+import { useSellerStore } from '@/store/sellerStore';
 import { useTheme } from '@/theme/ThemeProvider';
 import type { CategorySlug, ListingCondition } from '@/types';
 import { validateRequired } from '@/utils/validation';
@@ -33,6 +39,11 @@ export default function CreateListing() {
   const toast = useToast();
   const { lang } = useLocale();
   const defaultCity = useLocationStore((s) => s.cityId);
+  const createListing = useCreateListing();
+  const mockStatus = useSellerStore((s) => s.status);
+  const liveProfile = useMySellerProfile(!env.useMocks);
+  const sellerStatus = env.useMocks ? mockStatus : (liveProfile.data?.status ?? 'not_submitted');
+  const isVerified = sellerStatus === 'verified';
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -58,7 +69,11 @@ export default function CreateListing() {
     { value: 'EUR', label: 'EUR (€)' },
   ];
 
-  const submit = (publish: boolean) => {
+  const submit = async (publish: boolean) => {
+    if (publish && !isVerified) {
+      toast.error(t('createListing.verificationRequired'));
+      return;
+    }
     const nextErrors: Record<string, string> = {};
     const titleError = validateRequired(title);
     const priceError = validateRequired(price);
@@ -66,14 +81,41 @@ export default function CreateListing() {
     if (priceError) nextErrors.price = priceError;
     if (!category) nextErrors.category = 'validation.required';
     if (!cityId) nextErrors.city = 'validation.required';
+    if (publish && images.length === 0) nextErrors.images = 'createListing.imagesRequired';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       toast.error(t('validation.fixErrors'));
       return;
     }
-    // Mock: acknowledge submission. A Supabase build inserts into `listings`.
-    toast.success(publish ? t('createListing.published') : t('createListing.draftSaved'));
-    router.back();
+
+    try {
+      const listing = await createListing.mutateAsync({
+        title: title.trim(),
+        description: description.trim(),
+        categorySlug: category as CategorySlug,
+        price: Number(price),
+        currency,
+        condition,
+        cityId: cityId as string,
+        postalCode: postalCode.trim() || undefined,
+        delivery,
+        pickup,
+        imageUris: images,
+        publish,
+      });
+      toast.success(publish ? t('createListing.published') : t('createListing.draftSaved'));
+      if (publish) {
+        router.replace(`/listing/${listing.id}`);
+      } else {
+        router.back();
+      }
+    } catch (err) {
+      if (err instanceof SellerNotVerifiedError) {
+        toast.error(t('createListing.verificationRequired'));
+      } else {
+        toast.error(t('createListing.submitFailed'));
+      }
+    }
   };
 
   return (
@@ -82,9 +124,23 @@ export default function CreateListing() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Screen scroll edges={['bottom']} contentContainerStyle={{ gap: theme.spacing.lg }}>
+        {!isVerified ? (
+          <Card padded style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-start' }}>
+            <Ionicons name="shield-outline" size={20} color={theme.colors.warning} />
+            <Text variant="caption" color="textMuted" style={{ flex: 1 }}>
+              {t('createListing.verificationRequired')}
+            </Text>
+          </Card>
+        ) : null}
+
         <View style={{ gap: theme.spacing.sm }}>
           <Text variant="label">{t('createListing.images')}</Text>
           <ImageUploadGrid images={images} onChange={setImages} />
+          {errors.images ? (
+            <Text variant="caption" color="danger">
+              {t(errors.images)}
+            </Text>
+          ) : null}
         </View>
 
         <Input
@@ -174,11 +230,17 @@ export default function CreateListing() {
         <ToggleRow label={t('createListing.pickup')} value={pickup} onChange={setPickup} />
 
         <View style={{ gap: theme.spacing.md, marginTop: theme.spacing.sm }}>
-          <Button title={t('createListing.publish')} onPress={() => submit(true)} />
+          <Button
+            title={t('createListing.publish')}
+            onPress={() => void submit(true)}
+            loading={createListing.isPending}
+            disabled={createListing.isPending || !isVerified}
+          />
           <Button
             title={t('createListing.saveDraft')}
             variant="secondary"
-            onPress={() => submit(false)}
+            onPress={() => void submit(false)}
+            disabled={createListing.isPending}
           />
         </View>
       </Screen>
