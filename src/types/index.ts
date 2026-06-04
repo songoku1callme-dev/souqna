@@ -66,6 +66,26 @@ export type SellerProfile = {
   createdAt: string;
 };
 
+/** The current user's own verification request (used to surface rejection reasons). */
+export type VerificationRequest = {
+  id: string;
+  status: SellerStatus;
+  reviewerNotes?: string;
+  createdAt: string;
+};
+
+/** A pending verification request shown in the admin moderation queue. */
+export type PendingVerification = {
+  id: string;
+  sellerProfileId: string;
+  userId: string;
+  displayName: string;
+  legalName?: string;
+  cityId?: string;
+  documentPaths: string[];
+  createdAt: string;
+};
+
 export type ListingImage = {
   id: string;
   listingId: string;

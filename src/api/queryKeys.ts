@@ -11,4 +11,6 @@ export const queryKeys = {
   conversations: ['conversations'] as const,
   messages: (id: string) => ['messages', id] as const,
   mySellerProfile: ['seller', 'me'] as const,
+  myVerificationRequest: ['seller', 'me', 'verification'] as const,
+  pendingVerifications: ['admin', 'verifications', 'pending'] as const,
 };

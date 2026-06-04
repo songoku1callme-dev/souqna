@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { useMySellerProfile } from '@/api/hooks';
+import { useMySellerProfile, useMyVerificationRequest } from '@/api/hooks';
 import { env } from '@/config/env';
 import { useIsAuthenticated } from '@/store/authStore';
 import { useSellerStore } from '@/store/sellerStore';
@@ -28,6 +28,9 @@ export default function SellScreen() {
   const mockStatus = useSellerStore((s) => s.status);
   const liveProfile = useMySellerProfile(!env.useMocks && isAuthenticated);
   const status = env.useMocks ? mockStatus : (liveProfile.data?.status ?? 'not_submitted');
+  const liveRequest = useMyVerificationRequest(
+    !env.useMocks && isAuthenticated && status === 'rejected',
+  );
 
   return (
     <Screen scroll edges={['top']} contentContainerStyle={{ gap: 20 }}>
@@ -45,7 +48,7 @@ export default function SellScreen() {
           badge={t('sell.statusPending')}
         />
       ) : status === 'rejected' ? (
-        <RejectedView />
+        <RejectedView reason={liveRequest.data?.reviewerNotes} />
       ) : (
         <GateView benefits={BENEFITS} />
       )}
@@ -131,7 +134,7 @@ function VerifiedView() {
   );
 }
 
-function RejectedView() {
+function RejectedView({ reason }: { reason?: string }) {
   const theme = useTheme();
   const router = useRouter();
   const { t } = useTranslation();
@@ -144,6 +147,14 @@ function RejectedView() {
         body={t('sell.rejectedBody')}
         badge={t('sell.statusRejected')}
       />
+      {reason ? (
+        <Card padded style={{ gap: theme.spacing.xs }}>
+          <Text variant="label" color="textMuted">
+            {t('sell.rejectionReason')}
+          </Text>
+          <Text variant="body">{reason}</Text>
+        </Card>
+      ) : null}
       <Button title={t('sell.resubmit')} onPress={() => router.push('/seller-onboarding')} />
     </View>
   );

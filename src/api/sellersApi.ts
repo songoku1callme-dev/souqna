@@ -1,7 +1,14 @@
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase';
 import { SELLERS, getSellerById } from '@/data/sellers';
-import type { CategorySlug, SellerProfile, SellerStatus, SellerSummary } from '@/types';
+import type {
+  CategorySlug,
+  PendingVerification,
+  SellerProfile,
+  SellerStatus,
+  SellerSummary,
+  VerificationRequest,
+} from '@/types';
 import { delay } from './client';
 import { uploadVerificationDocs } from './storageApi';
 
@@ -195,4 +202,189 @@ export async function submitSellerVerification(
   if (requestError) throw requestError;
 
   return profile;
+}
+
+/* ------------------------------------------------------------------ *
+ * Verification request status (owner) + admin moderation queue
+ * ------------------------------------------------------------------ */
+
+type VerificationRequestRow = {
+  id: string;
+  status: SellerStatus;
+  reviewer_notes: string | null;
+  created_at: string | null;
+};
+
+/**
+ * The current user's most recent verification request — used to surface the
+ * rejection reason (reviewer notes) when status is `rejected`. RLS lets the
+ * owner read only their own request.
+ */
+export async function fetchMyVerificationRequest(): Promise<VerificationRequest | null> {
+  if (env.useMocks || !supabase) return null;
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from('seller_verification_requests')
+    .select('id, status, reviewer_notes, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as VerificationRequestRow;
+  return {
+    id: row.id,
+    status: row.status,
+    reviewerNotes: row.reviewer_notes ?? undefined,
+    createdAt: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+type PendingVerificationRow = {
+  id: string;
+  seller_profile_id: string;
+  user_id: string;
+  legal_name: string | null;
+  document_paths: string[] | null;
+  created_at: string | null;
+  // Supabase types a to-one embed as an array; at runtime it is a single object.
+  seller_profiles: { display_name: string; city_id: string | null } | null;
+};
+
+type PendingVerificationQueryRow = Omit<PendingVerificationRow, 'seller_profiles'> & {
+  seller_profiles: { display_name: string; city_id: string | null } | { display_name: string; city_id: string | null }[] | null;
+};
+
+function firstOrSelf<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+/**
+ * Pending verification requests for the admin moderation queue. RLS restricts
+ * reads to admins (`is_admin()`); a non-admin caller simply receives an empty
+ * set. In mock mode this returns a small demo queue so the screen is testable.
+ */
+export async function fetchPendingVerifications(): Promise<PendingVerification[]> {
+  if (env.useMocks || !supabase) {
+    return delay([
+      {
+        id: 'req-mock-1',
+        sellerProfileId: 'seller-mock-1',
+        userId: 'user-mock-1',
+        displayName: 'Damascus Electronics',
+        legalName: 'Damascus Electronics LLC',
+        cityId: 'damascus',
+        documentPaths: ['mock/id.png'],
+        createdAt: new Date(Date.now() - 36e5).toISOString(),
+      },
+      {
+        id: 'req-mock-2',
+        sellerProfileId: 'seller-mock-2',
+        userId: 'user-mock-2',
+        displayName: 'Aleppo Home Goods',
+        legalName: undefined,
+        cityId: 'aleppo',
+        documentPaths: ['mock/id.png', 'mock/license.png'],
+        createdAt: new Date(Date.now() - 9e6).toISOString(),
+      },
+    ]);
+  }
+  const { data, error } = await supabase
+    .from('seller_verification_requests')
+    .select(
+      'id, seller_profile_id, user_id, legal_name, document_paths, created_at, seller_profiles!inner(display_name, city_id)',
+    )
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return ((data as PendingVerificationQueryRow[] | null) ?? []).map((row) => {
+    const profile = firstOrSelf(row.seller_profiles);
+    return {
+      id: row.id,
+      sellerProfileId: row.seller_profile_id,
+      userId: row.user_id,
+      displayName: profile?.display_name ?? row.legal_name ?? '—',
+      legalName: row.legal_name ?? undefined,
+      cityId: profile?.city_id ?? undefined,
+      documentPaths: row.document_paths ?? [],
+      createdAt: row.created_at ?? new Date().toISOString(),
+    };
+  });
+}
+
+export type ReviewVerificationInput = {
+  requestId: string;
+  sellerProfileId: string;
+  userId: string;
+};
+
+/**
+ * Approve a verification request (admin only). Flips the seller profile +
+ * request to `verified`, records the reviewer, and grants the `seller` role.
+ * RLS enforces that only admins can perform these writes — there is no
+ * service-role key in the app.
+ */
+export async function approveSellerVerification(input: ReviewVerificationInput): Promise<void> {
+  if (env.useMocks || !supabase) {
+    await delay(null);
+    return;
+  }
+  const { data: auth } = await supabase.auth.getUser();
+  const reviewerId = auth.user?.id ?? null;
+  const now = new Date().toISOString();
+
+  const { error: profileError } = await supabase
+    .from('seller_profiles')
+    .update({ status: 'verified', updated_at: now })
+    .eq('id', input.sellerProfileId);
+  if (profileError) throw profileError;
+
+  const { error: requestError } = await supabase
+    .from('seller_verification_requests')
+    .update({ status: 'verified', reviewer_id: reviewerId, reviewer_notes: null, updated_at: now })
+    .eq('id', input.requestId);
+  if (requestError) throw requestError;
+
+  const { error: roleError } = await supabase
+    .from('user_roles')
+    .upsert({ user_id: input.userId, role: 'seller' }, { onConflict: 'user_id,role' });
+  if (roleError) throw roleError;
+}
+
+/**
+ * Reject a verification request (admin only) with a reason that is surfaced to
+ * the seller as the rejection note. Sets both the profile and request to
+ * `rejected` so the seller can review and resubmit.
+ */
+export async function rejectSellerVerification(
+  input: ReviewVerificationInput & { reason: string },
+): Promise<void> {
+  if (env.useMocks || !supabase) {
+    await delay(null);
+    return;
+  }
+  const { data: auth } = await supabase.auth.getUser();
+  const reviewerId = auth.user?.id ?? null;
+  const now = new Date().toISOString();
+
+  const { error: profileError } = await supabase
+    .from('seller_profiles')
+    .update({ status: 'rejected', updated_at: now })
+    .eq('id', input.sellerProfileId);
+  if (profileError) throw profileError;
+
+  const { error: requestError } = await supabase
+    .from('seller_verification_requests')
+    .update({
+      status: 'rejected',
+      reviewer_id: reviewerId,
+      reviewer_notes: input.reason || null,
+      updated_at: now,
+    })
+    .eq('id', input.requestId);
+  if (requestError) throw requestError;
 }

@@ -10,9 +10,11 @@ import type {
   Conversation,
   Listing,
   Message,
+  PendingVerification,
   SellerProfile,
   SellerSummary,
   ListingFilters,
+  VerificationRequest,
 } from '@/types';
 import { fetchConversations, fetchMessages, sendMessage } from './conversationsApi';
 import {
@@ -28,10 +30,15 @@ import {
 } from './listingsApi';
 import { queryKeys } from './queryKeys';
 import {
+  approveSellerVerification,
   fetchFeaturedSellers,
   fetchMySellerProfile,
+  fetchMyVerificationRequest,
+  fetchPendingVerifications,
   fetchSeller,
+  rejectSellerVerification,
   submitSellerVerification,
+  type ReviewVerificationInput,
   type SellerVerificationInput,
 } from './sellersApi';
 
@@ -136,6 +143,49 @@ export function useSubmitVerification() {
     mutationFn: (input: SellerVerificationInput) => submitSellerVerification(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.mySellerProfile });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myVerificationRequest });
+    },
+  });
+}
+
+/** The current user's latest verification request (for rejection reason). */
+export function useMyVerificationRequest(enabled = true): UseQueryResult<VerificationRequest | null> {
+  return useQuery({
+    queryKey: queryKeys.myVerificationRequest,
+    queryFn: fetchMyVerificationRequest,
+    enabled,
+  });
+}
+
+/** Pending verification requests for the admin moderation queue. */
+export function usePendingVerifications(enabled = true): UseQueryResult<PendingVerification[]> {
+  return useQuery({
+    queryKey: queryKeys.pendingVerifications,
+    queryFn: fetchPendingVerifications,
+    enabled,
+  });
+}
+
+/** Approve a verification request (admin only). */
+export function useApproveVerification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReviewVerificationInput) => approveSellerVerification(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pendingVerifications });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sellers });
+    },
+  });
+}
+
+/** Reject a verification request with a reason (admin only). */
+export function useRejectVerification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ReviewVerificationInput & { reason: string }) =>
+      rejectSellerVerification(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pendingVerifications });
     },
   });
 }
