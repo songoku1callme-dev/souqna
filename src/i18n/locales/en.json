@@ -244,8 +244,10 @@
       "uploaded": "Uploaded",
       "idRequired": "Please upload an identity document.",
       "submitFailed": "Could not submit your request. Please try again.",
-      "uploadedCount": "{{count}} added"
-    }
+      "uploadedCount": "{{count}} added",
+      "resubmitTitle": "Resubmit your verification"
+    },
+    "rejectionReason": "Reason"
   },
   "createListing": {
     "title": "Create listing",
@@ -317,7 +319,9 @@
     "contentPolicy": "Content policy",
     "about": "About Souqna",
     "signOut": "Sign out",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "adminSection": "Admin",
+    "adminVerifyQueue": "Verification queue"
   },
   "orders": {
     "title": "My orders",
@@ -450,5 +454,28 @@
     "supportTitle": "Help & support",
     "supportBody": "Need help? In this demo, support is a placeholder. A production build would connect you to a help center, email support, and FAQs.",
     "placeholderNote": "This is placeholder content for the MVP and is not legal advice."
+  },
+  "admin": {
+    "title": "Verification queue",
+    "queueIntro": "Review seller verification requests. Approving grants the seller role and lets them publish.",
+    "notAuthorizedTitle": "Admins only",
+    "notAuthorizedBody": "You do not have access to the verification queue.",
+    "emptyTitle": "No pending requests",
+    "emptyBody": "New seller verification requests will appear here.",
+    "pendingSince": "Submitted {{date}}",
+    "viewDocuments": "View documents ({{count}})",
+    "openDocument": "Open document {{index}}",
+    "noDocuments": "No documents attached",
+    "docsUnavailable": "Could not open the documents. Please try again.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approved": "Seller verified",
+    "rejected": "Request rejected",
+    "actionFailed": "Action failed. Please try again.",
+    "rejectTitle": "Reject verification",
+    "rejectBody": "Let {{name}} know why their request was not approved.",
+    "reasonLabel": "Reason for rejection",
+    "reasonHint": "Shown to the seller so they can resubmit.",
+    "confirmReject": "Confirm rejection"
   }
 }

@@ -5,9 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { useSubmitVerification } from '@/api/hooks';
+import {
+  useMySellerProfile,
+  useMyVerificationRequest,
+  useSubmitVerification,
+} from '@/api/hooks';
 import { env } from '@/config/env';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Chip } from '@/components/ui/Chip';
 import { Input } from '@/components/ui/Input';
@@ -33,8 +39,15 @@ export default function SellerOnboarding() {
   const { lang } = useLocale();
   const user = useAuthStore((s) => s.user);
   const defaultCity = useLocationStore((s) => s.cityId);
+  const mockStatus = useSellerStore((s) => s.status);
   const submitApplication = useSellerStore((s) => s.submitApplication);
   const submitVerification = useSubmitVerification();
+  const isAuthenticated = !!user;
+  const liveProfile = useMySellerProfile(!env.useMocks && isAuthenticated);
+  const status = env.useMocks ? mockStatus : (liveProfile.data?.status ?? 'not_submitted');
+  const isResubmit = status === 'rejected';
+  const liveRequest = useMyVerificationRequest(!env.useMocks && isAuthenticated && isResubmit);
+  const rejectionReason = liveRequest.data?.reviewerNotes;
 
   const [displayName, setDisplayName] = useState(user?.fullName ?? '');
   const [legalName, setLegalName] = useState('');
@@ -126,6 +139,16 @@ export default function SellerOnboarding() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Screen scroll edges={['bottom']} contentContainerStyle={{ gap: theme.spacing.lg }}>
+        {isResubmit ? (
+          <Card padded style={{ gap: theme.spacing.xs }}>
+            <Badge label={t('sell.statusRejected')} tone="danger" />
+            <Text variant="subtitle">{t('sell.form.resubmitTitle')}</Text>
+            <Text variant="body" color="textMuted">
+              {rejectionReason ?? t('sell.rejectedBody')}
+            </Text>
+          </Card>
+        ) : null}
+
         <Text variant="body" color="textMuted">
           {t('sell.form.intro')}
         </Text>
@@ -226,7 +249,7 @@ export default function SellerOnboarding() {
         ) : null}
 
         <Button
-          title={t('sell.form.submit')}
+          title={isResubmit ? t('sell.resubmit') : t('sell.form.submit')}
           onPress={() => void submit()}
           loading={submitVerification.isPending}
           disabled={submitVerification.isPending}

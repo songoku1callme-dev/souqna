@@ -91,6 +91,22 @@ export async function uploadListingImages(
 }
 
 /**
+ * Create short-lived signed URLs for private verification documents so an
+ * admin/owner can preview them. Returns an empty array in mock mode.
+ */
+export async function signedVerificationDocUrls(
+  paths: string[],
+  expiresInSeconds = 300,
+): Promise<string[]> {
+  if (env.useMocks || !supabase || paths.length === 0) return [];
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKETS.verificationDocs)
+    .createSignedUrls(paths, expiresInSeconds);
+  if (error) throw error;
+  return (data ?? []).map((d) => d.signedUrl).filter((u): u is string => Boolean(u));
+}
+
+/**
  * Upload verification documents to the private bucket. Paths MUST be prefixed
  * with the user's auth id to satisfy the owner-write RLS policy.
  * Returns the storage paths (not public URLs — the bucket is private).

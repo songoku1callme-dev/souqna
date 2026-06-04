@@ -244,8 +244,10 @@
       "uploaded": "تم الرفع",
       "idRequired": "يرجى رفع وثيقة هوية.",
       "submitFailed": "تعذّر إرسال طلبك. حاول مرة أخرى.",
-      "uploadedCount": "{{count}} مرفقة"
-    }
+      "uploadedCount": "{{count}} مرفقة",
+      "resubmitTitle": "أعد إرسال طلب التوثيق"
+    },
+    "rejectionReason": "السبب"
   },
   "createListing": {
     "title": "إنشاء إعلان",
@@ -317,7 +319,9 @@
     "contentPolicy": "سياسة المحتوى",
     "about": "عن سوقنا",
     "signOut": "تسجيل الخروج",
-    "version": "الإصدار {{version}}"
+    "version": "الإصدار {{version}}",
+    "adminSection": "الإدارة",
+    "adminVerifyQueue": "قائمة طلبات التوثيق"
   },
   "orders": {
     "title": "طلباتي",
@@ -450,5 +454,28 @@
     "supportTitle": "المساعدة والدعم",
     "supportBody": "تحتاج مساعدة؟ في هذا العرض التجريبي الدعم عنصر نائب. سيربطك الإصدار النهائي بمركز مساعدة ودعم بالبريد وأسئلة شائعة.",
     "placeholderNote": "هذا محتوى مبدئي للنسخة الأولية وليس استشارة قانونية."
+  },
+  "admin": {
+    "title": "قائمة طلبات التوثيق",
+    "queueIntro": "راجع طلبات توثيق البائعين. تمنح الموافقة دور البائع وتتيح له نشر الإعلانات.",
+    "notAuthorizedTitle": "للمشرفين فقط",
+    "notAuthorizedBody": "ليس لديك صلاحية الوصول إلى قائمة التوثيق.",
+    "emptyTitle": "لا توجد طلبات معلّقة",
+    "emptyBody": "ستظهر طلبات توثيق البائعين الجديدة هنا.",
+    "pendingSince": "أُرسل في {{date}}",
+    "viewDocuments": "عرض المستندات ({{count}})",
+    "openDocument": "فتح المستند {{index}}",
+    "noDocuments": "لا توجد مستندات مرفقة",
+    "docsUnavailable": "تعذّر فتح المستندات. حاول مرة أخرى.",
+    "approve": "موافقة",
+    "reject": "رفض",
+    "approved": "تم توثيق البائع",
+    "rejected": "تم رفض الطلب",
+    "actionFailed": "فشل الإجراء. حاول مرة أخرى.",
+    "rejectTitle": "رفض التوثيق",
+    "rejectBody": "أخبر {{name}} بسبب عدم الموافقة على الطلب.",
+    "reasonLabel": "سبب الرفض",
+    "reasonHint": "يظهر للبائع ليتمكن من إعادة الإرسال.",
+    "confirmReject": "تأكيد الرفض"
   }
 }

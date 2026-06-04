@@ -12,6 +12,8 @@ import { ListRow } from '@/components/ui/ListRow';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { useToast } from '@/components/ui/Toast';
+import { useMySellerProfile } from '@/api/hooks';
+import { env } from '@/config/env';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import { useAuthStore, useIsAuthenticated } from '@/store/authStore';
 import { useSellerStore } from '@/store/sellerStore';
@@ -27,7 +29,10 @@ export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useIsAuthenticated();
   const signOut = useAuthStore((s) => s.signOut);
-  const sellerStatus = useSellerStore((s) => s.status);
+  const mockStatus = useSellerStore((s) => s.status);
+  const liveProfile = useMySellerProfile(!env.useMocks && isAuthenticated);
+  const sellerStatus = env.useMocks ? mockStatus : (liveProfile.data?.status ?? 'not_submitted');
+  const isAdmin = !!user?.roles.includes('admin');
   const favoritesCount = useFavoritesStore((s) => s.ids.length);
   const languagePreference = useSettingsStore((s) => s.languagePreference);
   const themePreference = useSettingsStore((s) => s.themePreference);
@@ -77,6 +82,16 @@ export default function ProfileScreen() {
           onPress={() => router.push('/(tabs)/sell')}
         />
       </Section>
+
+      {isAdmin ? (
+        <Section title={t('profile.adminSection')}>
+          <ListRow
+            icon="shield-checkmark-outline"
+            label={t('profile.adminVerifyQueue')}
+            onPress={() => router.push('/admin/verify')}
+          />
+        </Section>
+      ) : null}
 
       <Section title={t('profile.activitySection')}>
         <ListRow
