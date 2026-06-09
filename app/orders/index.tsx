@@ -1,23 +1,46 @@
-import { useMemo } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { useMyOrders } from '@/api/hooks';
 import { OrderCard } from '@/components/orders/OrderCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Screen } from '@/components/ui/Screen';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
-import { selectBuyerOrders, useOrdersStore } from '@/store/ordersStore';
 import { useTheme } from '@/theme/ThemeProvider';
 
 export default function BuyerOrdersScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { t } = useTranslation();
-  const allOrders = useOrdersStore((s) => s.orders);
-  const orders = useMemo(() => selectBuyerOrders(allOrders), [allOrders]);
+  const { data: orders, isLoading, isError, refetch } = useMyOrders();
 
-  if (orders.length === 0) {
+  if (isLoading) {
+    return (
+      <Screen scroll edges={[]} contentContainerStyle={{ gap: theme.spacing.md }}>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} width="100%" height={96} />
+        ))}
+      </Screen>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Screen edges={[]}>
+        <EmptyState
+          icon="cloud-offline-outline"
+          title={t('errors.generic')}
+          body={t('errors.genericBody')}
+          actionLabel={t('common.retry')}
+          onAction={() => void refetch()}
+        />
+      </Screen>
+    );
+  }
+
+  if (!orders || orders.length === 0) {
     return (
       <Screen edges={[]}>
         <EmptyState

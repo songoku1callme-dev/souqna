@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { useOrder, useReportOrderIssue } from '@/api/hooks';
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge';
 import { OrderTimeline } from '@/components/orders/OrderTimeline';
 import { Button } from '@/components/ui/Button';
@@ -14,9 +15,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Screen } from '@/components/ui/Screen';
 import { Sheet } from '@/components/ui/Sheet';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/Text';
 import { useToast } from '@/components/ui/Toast';
-import { useOrdersStore } from '@/store/ordersStore';
 import { useTheme } from '@/theme/ThemeProvider';
 import { formatFullDate, formatPrice } from '@/utils/format';
 
@@ -26,11 +27,37 @@ export default function OrderDetailScreen() {
   const { t } = useTranslation();
   const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const order = useOrdersStore((s) => s.orders.find((o) => o.id === id));
-  const reportIssue = useOrdersStore((s) => s.reportIssue);
+  const { data: order, isLoading, isError, refetch } = useOrder(id);
+  const reportIssue = useReportOrderIssue(id);
 
   const [issueOpen, setIssueOpen] = useState(false);
   const [issueText, setIssueText] = useState('');
+
+  if (isLoading) {
+    return (
+      <Screen scroll edges={[]} contentContainerStyle={{ gap: theme.spacing.lg }}>
+        <Stack.Screen options={{ title: '' }} />
+        <Skeleton width="100%" height={96} />
+        <Skeleton width="100%" height={140} />
+        <Skeleton width="100%" height={120} />
+      </Screen>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Screen edges={[]}>
+        <Stack.Screen options={{ title: '' }} />
+        <EmptyState
+          icon="cloud-offline-outline"
+          title={t('errors.generic')}
+          body={t('errors.genericBody')}
+          actionLabel={t('common.retry')}
+          onAction={() => void refetch()}
+        />
+      </Screen>
+    );
+  }
 
   if (!order) {
     return (
@@ -48,10 +75,14 @@ export default function OrderDetailScreen() {
   };
 
   const submitIssue = () => {
-    reportIssue(order.id, issueText.trim() || t('orders.reportIssue'));
-    setIssueOpen(false);
-    setIssueText('');
-    toast.success(t('orders.issueReported'));
+    reportIssue.mutate(issueText.trim() || t('orders.reportIssue'), {
+      onSuccess: () => {
+        setIssueOpen(false);
+        setIssueText('');
+        toast.success(t('orders.issueReported'));
+      },
+      onError: () => toast.show(t('errors.generic'), 'error'),
+    });
   };
 
   return (
@@ -216,7 +247,12 @@ export default function OrderDetailScreen() {
             onChangeText={setIssueText}
             placeholder={t('orders.reportIssuePlaceholder')}
           />
-          <Button title={t('trust.submitReport')} icon="flag-outline" onPress={submitIssue} />
+          <Button
+            title={t('trust.submitReport')}
+            icon="flag-outline"
+            loading={reportIssue.isPending}
+            onPress={submitIssue}
+          />
         </View>
       </Sheet>
     </Screen>

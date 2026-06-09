@@ -90,6 +90,14 @@ export default function ListingDetail() {
     router.push('/(tabs)/inbox');
   };
 
+  const buyNow = () => {
+    if (!isAuthenticated) {
+      router.push('/(auth)/sign-in');
+      return;
+    }
+    router.push({ pathname: '/checkout', params: { listingId: item.id } });
+  };
+
   const onFavorite = () => {
     const added = toggleFavorite(item.id);
     toast.show(added ? t('listing.savedToFavorites') : t('listing.removedFromFavorites'), 'info');
@@ -203,11 +211,17 @@ export default function ListingDetail() {
             onPress={onFavorite}
             accessibilityLabel={t('listing.save')}
           />
+          <IconButton
+            icon="chatbubble-ellipses-outline"
+            variant="surface"
+            onPress={contact}
+            accessibilityLabel={t('listing.contactSeller')}
+          />
           <View style={{ flex: 1 }}>
             <Button
-              title={t('listing.contactSeller')}
-              icon="chatbubble-ellipses-outline"
-              onPress={contact}
+              title={t('listing.buyNow')}
+              icon="bag-check-outline"
+              onPress={buyNow}
             />
           </View>
         </View>

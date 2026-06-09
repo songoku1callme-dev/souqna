@@ -192,7 +192,8 @@
     "reportSuccess": "Thanks — our team will review this listing.",
     "savedToFavorites": "Saved to favorites",
     "removedFromFavorites": "Removed from favorites",
-    "contactStarted": "We've started a conversation with the seller."
+    "contactStarted": "We've started a conversation with the seller.",
+    "buyNow": "Buy now"
   },
   "seller": {
     "listings": "Listings from this seller",
@@ -268,6 +269,22 @@
     "publish": "Publish listing",
     "published": "Your listing is live!",
     "draftSaved": "Draft saved"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "soldBy": "Sold by",
+    "quantity": "Quantity",
+    "increaseQuantity": "Increase quantity",
+    "decreaseQuantity": "Decrease quantity",
+    "unitPrice": "Unit price",
+    "summary": "Order summary",
+    "total": "Total",
+    "placeOrder": "Place order",
+    "signInToBuy": "Sign in to buy",
+    "orderPlaced": "Order placed",
+    "disclaimer": "You'll arrange payment and delivery details with the seller after placing the order.",
+    "unavailableTitle": "Listing unavailable",
+    "unavailableBody": "This item can no longer be purchased."
   },
   "inbox": {
     "title": "Inbox",

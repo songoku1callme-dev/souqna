@@ -10,4 +10,6 @@ export const queryKeys = {
   related: (id: string) => ['listing', id, 'related'] as const,
   conversations: ['conversations'] as const,
   messages: (id: string) => ['messages', id] as const,
+  myOrders: ['orders', 'me'] as const,
+  order: (id: string) => ['order', id] as const,
 };

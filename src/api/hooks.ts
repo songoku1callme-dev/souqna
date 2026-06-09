@@ -6,8 +6,15 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
-import type { Conversation, Listing, Message, SellerSummary, ListingFilters } from '@/types';
+import type { Conversation, Listing, Message, Order, SellerSummary, ListingFilters } from '@/types';
 import { fetchConversations, fetchMessages, sendMessage } from './conversationsApi';
+import {
+  fetchMyOrders,
+  fetchOrder,
+  placeOrder,
+  reportOrderIssue,
+  type PlaceOrderInput,
+} from './ordersApi';
 import {
   fetchListing,
   fetchListings,
@@ -89,6 +96,43 @@ export function useSendMessage(conversationId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+    },
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Orders / checkout
+ * ------------------------------------------------------------------ */
+
+/** The signed-in user's placed orders (buyer perspective). */
+export function useMyOrders(): UseQueryResult<Order[]> {
+  return useQuery({ queryKey: queryKeys.myOrders, queryFn: fetchMyOrders });
+}
+
+/** A single order with items, status history and shipment tracking. */
+export function useOrder(id: string): UseQueryResult<Order | null> {
+  return useQuery({ queryKey: queryKeys.order(id), queryFn: () => fetchOrder(id) });
+}
+
+/** Place an order from a listing, then refresh the buyer's orders. */
+export function usePlaceOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PlaceOrderInput) => placeOrder(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myOrders });
+    },
+  });
+}
+
+/** Raise an issue on an order; refreshes the order + the orders list. */
+export function useReportOrderIssue(orderId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (note: string) => reportOrderIssue(orderId, note),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.order(orderId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myOrders });
     },
   });
 }

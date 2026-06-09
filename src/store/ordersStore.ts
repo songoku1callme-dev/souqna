@@ -19,6 +19,7 @@ export type ShipmentInput = {
 type OrdersState = {
   orders: Order[];
   getById: (id: string) => Order | undefined;
+  addOrder: (order: Order) => void;
   updateStatus: (orderId: string, status: OrderStatus, note?: string) => void;
   saveShipment: (orderId: string, input: ShipmentInput) => void;
   reportIssue: (orderId: string, note: string) => void;
@@ -41,6 +42,8 @@ export const useOrdersStore = create<OrdersState>()(
       orders: seed(),
 
       getById: (id) => get().orders.find((o) => o.id === id),
+
+      addOrder: (order) => set((state) => ({ orders: [order, ...state.orders] })),
 
       updateStatus: (orderId, status, note) =>
         set((state) => ({

@@ -64,6 +64,10 @@ function RootNavigator() {
           options={{ title: t('createListing.title'), presentation: 'modal' }}
         />
         <Stack.Screen name="seller-onboarding" options={{ title: t('sell.form.title') }} />
+        <Stack.Screen
+          name="checkout"
+          options={{ title: t('checkout.title'), presentation: 'modal' }}
+        />
         <Stack.Screen name="orders/index" options={{ title: t('orders.title') }} />
         <Stack.Screen name="orders/[id]" options={{ title: '' }} />
         <Stack.Screen name="seller-orders/index" options={{ title: t('orders.sellerEntry') }} />
