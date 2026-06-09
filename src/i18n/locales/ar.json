@@ -192,7 +192,8 @@
     "reportSuccess": "شكراً — سيقوم فريقنا بمراجعة هذا الإعلان.",
     "savedToFavorites": "أُضيف إلى المفضلة",
     "removedFromFavorites": "أُزيل من المفضلة",
-    "contactStarted": "بدأنا محادثة مع البائع."
+    "contactStarted": "بدأنا محادثة مع البائع.",
+    "buyNow": "اشترِ الآن"
   },
   "seller": {
     "listings": "إعلانات هذا البائع",
@@ -268,6 +269,22 @@
     "publish": "نشر الإعلان",
     "published": "إعلانك الآن منشور!",
     "draftSaved": "تم حفظ المسودة"
+  },
+  "checkout": {
+    "title": "إتمام الشراء",
+    "soldBy": "البائع",
+    "quantity": "الكمية",
+    "increaseQuantity": "زيادة الكمية",
+    "decreaseQuantity": "إنقاص الكمية",
+    "unitPrice": "سعر الوحدة",
+    "summary": "ملخص الطلب",
+    "total": "الإجمالي",
+    "placeOrder": "تأكيد الطلب",
+    "signInToBuy": "سجّل الدخول للشراء",
+    "orderPlaced": "تم تقديم الطلب",
+    "disclaimer": "ستتفق مع البائع على تفاصيل الدفع والتوصيل بعد تقديم الطلب.",
+    "unavailableTitle": "العرض غير متاح",
+    "unavailableBody": "لم يعد بالإمكان شراء هذا المنتج."
   },
   "inbox": {
     "title": "الرسائل",

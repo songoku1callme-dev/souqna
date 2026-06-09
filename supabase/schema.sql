@@ -659,3 +659,77 @@ create policy "shipment_updates seller write" on shipment_updates
             and o.seller_id in (select id from seller_profiles where user_id = auth.uid()))
     or is_admin()
   );
+
+-- =============================================================================
+-- Checkout: place_order RPC
+-- =============================================================================
+-- Buyers create orders through a SECURITY DEFINER function rather than direct
+-- inserts. This keeps order_items write access seller-only at the RLS layer
+-- (buyers never insert line items directly) while letting the price + line-item
+-- snapshot be computed SERVER-SIDE from the listing — the client cannot tamper
+-- with the amount charged. The function still runs as the calling buyer
+-- conceptually: it validates auth.uid() and records that uid as buyer_id.
+
+-- Monotonic counter backing the human-friendly order reference (SQ-YYYY-NNNN).
+create sequence if not exists order_reference_seq;
+
+create or replace function place_order(p_listing_id uuid, p_quantity int default 1)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_buyer    uuid := auth.uid();
+  v_listing  listings%rowtype;
+  v_seller   seller_profiles%rowtype;
+  v_image    text;
+  v_qty      int := greatest(coalesce(p_quantity, 1), 1);
+  v_subtotal numeric(12, 2);
+  v_ref      text;
+  v_order    uuid;
+begin
+  if v_buyer is null then
+    raise exception 'auth_required' using errcode = '28000';
+  end if;
+
+  select * into v_listing from listings where id = p_listing_id;
+  if not found then
+    raise exception 'listing_not_found' using errcode = 'P0002';
+  end if;
+  if v_listing.status <> 'active' then
+    raise exception 'listing_unavailable' using errcode = 'P0001';
+  end if;
+
+  -- A seller cannot buy their own listing.
+  select * into v_seller from seller_profiles where id = v_listing.seller_id;
+  if found and v_seller.user_id = v_buyer then
+    raise exception 'cannot_buy_own_listing' using errcode = 'P0001';
+  end if;
+
+  select url into v_image
+    from listing_images where listing_id = p_listing_id
+    order by position asc nulls last limit 1;
+
+  v_ref := 'SQ-' || to_char(now(), 'YYYY') || '-'
+           || lpad(nextval('order_reference_seq')::text, 4, '0');
+  v_subtotal := v_listing.price * v_qty;
+
+  insert into orders (reference, buyer_id, seller_id, city_id, subtotal, currency, status)
+  values (v_ref, v_buyer, v_listing.seller_id, v_listing.city_id,
+          v_subtotal, v_listing.currency, 'pending')
+  returning id into v_order;
+
+  insert into order_items (order_id, listing_id, title, image_url, unit_price, currency, quantity)
+  values (v_order, p_listing_id, v_listing.title, v_image,
+          v_listing.price, v_listing.currency, v_qty);
+
+  insert into order_status_history (order_id, status)
+  values (v_order, 'pending');
+
+  return v_order;
+end;
+$$;
+
+revoke all on function place_order(uuid, int) from public;
+grant execute on function place_order(uuid, int) to authenticated;
